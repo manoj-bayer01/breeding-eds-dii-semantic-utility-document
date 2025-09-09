@@ -152,61 +152,48 @@ def score_section(df_cols: set, section: str, sheet_name: str) -> int:
         score += 2
     return score
 
-def detect_sections(xlsx_path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def detect_sections(csv_path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Scan all sheets and auto-detect which sheet(s) contain cubes, joins, dimensions, and measures.
-    It tolerates extra/unknown columns and variable sheet names.
+    Detect sections from a single CSV file.
     Returns four DataFrames (may be empty): cubes_df, joins_df, dims_df, measures_df.
     """
-    xl = pd.ExcelFile(xlsx_path, engine="openpyxl")
+    try:
+        raw = pd.read_csv(csv_path, encoding='latin1', on_bad_lines='skip')
+    except FileNotFoundError:
+        print(f"Error: CSV file not found: {csv_path}", file=sys.stderr)
+        sys.exit(1)
 
-    cubes_df_list: List[pd.DataFrame] = []
-    joins_df_list: List[pd.DataFrame] = []
-    dims_df_list: List[pd.DataFrame] = []
-    measures_df_list: List[pd.DataFrame] = []
+    raw = drop_empty_rows_and_columns(raw)
+    if raw.empty:
+        print(f"[detect] CSV file is empty: {csv_path}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    for sheet in xl.sheet_names:
-        raw = pd.read_excel(xlsx_path, sheet_name=sheet, engine="openpyxl")
-        raw = drop_empty_rows_and_columns(raw)
-        if raw.empty:
-            if verbose:
-                print(f"[detect] Skip empty sheet: {sheet}")
-            continue
+    ndf = normalize_columns(raw)
 
-        ndf = normalize_columns(raw)
-        # Try remapping for each section and score
-        best_section = None
-        best_score = -1
-        candidates: Dict[str, pd.DataFrame] = {}
-        for section in ("cubes", "joins", "dimensions", "measures"):
-            remapped = remap_known_columns(ndf, section)
-            candidates[section] = remapped
-            sc = score_section(set(remapped.columns), section, sheet)
-            if sc > best_score:
-                best_score = sc
-                best_section = section
+    # Assume all columns belong to one of the four sections
+    cubes_df = pd.DataFrame()
+    joins_df = pd.DataFrame()
+    dims_df = pd.DataFrame()
+    measures_df = pd.DataFrame()
 
-        # Threshold: need at least 2 matches to accept
-        if best_section and best_score >= 2:
-            chosen = candidates[best_section]
-            if verbose:
-                print(f"[detect] Sheet '{sheet}' => {best_section} (score={best_score})")
-            if best_section == "cubes":
-                cubes_df_list.append(chosen)
-            elif best_section == "joins":
-                joins_df_list.append(chosen)
-            elif best_section == "dimensions":
-                dims_df_list.append(chosen)
-            elif best_section == "measures":
-                measures_df_list.append(chosen)
-        else:
-            if verbose:
-                print(f"[detect] Sheet '{sheet}' not confidently recognized (score={best_score}); ignoring.")
+    # Identify columns for each section based on column names
+    for col in ndf.columns:
+        col_lower = col.lower()
+        if "cube" in col_lower or "table" in col_lower:
+            cubes_df[col] = ndf[col]
+        elif "join" in col_lower or "relationship" in col_lower:
+            joins_df[col] = ndf[col]
+        elif "dimension" in col_lower or "dim" in col_lower:
+            dims_df[col] = ndf[col]
+        elif "measure" in col_lower or "metric" in col_lower:
+            measures_df[col] = ndf[col]
 
-    cubes_df = pd.concat(cubes_df_list, ignore_index=True) if cubes_df_list else pd.DataFrame()
-    joins_df = pd.concat(joins_df_list, ignore_index=True) if joins_df_list else pd.DataFrame()
-    dims_df = pd.concat(dims_df_list, ignore_index=True) if dims_df_list else pd.DataFrame()
-    measures_df = pd.concat(measures_df_list, ignore_index=True) if measures_df_list else pd.DataFrame()
+    # Remap columns to canonical names
+    cubes_df = remap_known_columns(cubes_df, "cubes")
+    joins_df = remap_known_columns(joins_df, "joins")
+    dims_df = remap_known_columns(dims_df, "dimensions")
+    measures_df = remap_known_columns(measures_df, "measures")
+
     return cubes_df, joins_df, dims_df, measures_df
 
 # --------------------------
@@ -381,16 +368,14 @@ def main():
     CLI entry point. Example:
       python excel_to_yaml.py -i ./examples/template.xlsx -o ./output/capacity_request.yml --only-cube capacity_request --verbose
     """
-    parser = argparse.ArgumentParser(description="Convert Excel semantic template to YAML (cubes, joins, dimensions, measures).")
-    parser.add_argument("-i", "--input", required=True, help="Path to input Excel file (.xlsx)")
-    parser.add_argument("-o", "--output", required=True, help="Path to output YAML file (.yml)")
+    parser = argparse.ArgumentParser(description="Convert semantic template to YAML (cubes, joins, dimensions, measures).")
     parser.add_argument("--only-cube", help="If set, include only this cube by name and filter joins accordingly.")
     parser.add_argument("--no-include-unknown", action="store_true", help="Do not include unknown/extra columns in the output YAML.")
     parser.add_argument("--verbose", action="store_true", help="Print detection details.")
     args = parser.parse_args()
 
-    input_path = Path(args.input)
-    output_path = Path(args.output)
+    input_path = Path("input/11291_v2_semantic_design_template.csv")
+    output_path = Path("output/11291_output.yml")
 
     if not input_path.exists():
         print(f"Error: Input file not found: {input_path}", file=sys.stderr)
@@ -399,9 +384,6 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     cubes_df, joins_df, dims_df, measures_df = detect_sections(input_path, verbose=args.verbose)
-    if cubes_df.empty and joins_df.empty and dims_df.empty and measures_df.empty:
-        print("Error: No recognizable sections found. Check your headers or use --verbose to see detection details.", file=sys.stderr)
-        sys.exit(1)
 
     data = build_yaml_structure(
         cubes_df,
