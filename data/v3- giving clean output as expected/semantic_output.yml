@@ -4,30 +4,16 @@ cubes:
   sql_table: '`bcs-breeding-datasets.velocity.capacity_request`'
   title: Capacity Request
   data_source: Breeding
-- description: abc2
-  name: capacity_request2
-  sql_table: '`bcs-breeding-datasets.velocity.capacity_request2`'''
-  title: Capacity Request2
-  data_source: Breeding2
 joins:
 - name: experiment_sets_entries
   relationship: one_to_many
   sql: '{CUBE.capacity_request_id}={experiment_sets_entries.capacity_request_id}'
-- name: experiment_sets_entries2
-  relationship: one_to_many
-  sql: '{CUBE.capacity_request_id2}={experiment_sets_entries.capacity_request_id2}'
 dimensions:
 - name: capacity_request_id
   title: Capacity Request ID
   description: The Capacity Request ID in Velocity is a unique identifier assigned to each capacity request made within the Capacity Request workflow in the Velocity application This ID helps users track and manage their requests effectively throughout the process.
   sql: '{CUBE}.capacity_request_id'
   type: number
-  primaryKey: true
-- name: capacity_request_id2
-  title: Capacity Request ID2
-  description: abc2
-  sql: '{CUBE}.capacity_request_name'
-  type: boolean
   primaryKey: true
 measures:
 - name: sum_of_total_sq_ft

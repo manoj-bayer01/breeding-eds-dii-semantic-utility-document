@@ -9,33 +9,13 @@ import yaml
 # Utilities for cleaning values
 # -----------------------------
 
-def strip_outer_quotes(s: str) -> str:
-    """
-    Remove any balanced wrapping single or double quotes around a string, repeatedly.
-    Preserves backticks and inner content.
-    Example: '''`table`''' -> `table`, "'text'" -> text
-    """
-    if s is None:
-        return s
-    s = s.strip()
-    if not s:
-        return s
-    # Repeatedly strip matching leading/trailing single or double quotes
-    while len(s) >= 2 and (s[0] == s[-1]) and s[0] in ("'", '"'):
-        s = s[1:-1].strip()
-    return s
-
 def clean_str(v):
     """
     Trim strings; return None for NaN/empty. Preserves special characters like {CUBE} and backticks.
-    Also removes any outer wrapping single/double quotes from values.
     """
     if pd.isna(v):
         return None
     s = str(v).strip()
-    if s == "":
-        return None
-    s = strip_outer_quotes(s)
     return s if s != "" else None
 
 def coerce_bool(v) -> Optional[bool]:
@@ -154,14 +134,14 @@ def remap_known_columns(df: pd.DataFrame, section: str) -> pd.DataFrame:
             rename_map[c] = alias_map[key_compact]
     return df.rename(columns=rename_map)
 
-def score_section(df_cols: set, section: str, sheet_name: str) -> int:
+def score_section(df_cols: set, section: str, hint_name: str) -> int:
     """
-    Score likelihood that a sheet is of a given section by:
+    Score likelihood that a CSV is of a given section by:
     - presence of required columns
-    - optional bias if sheet name hints the section
+    - optional bias if file/folder name hints the section
     """
     score = len(REQUIRED[section].intersection(df_cols))
-    lname = sheet_name.lower()
+    lname = hint_name.lower()
     if section == "cubes" and "cube" in lname:
         score += 2
     if section == "joins" and ("join" in lname or "relationship" in lname):
@@ -172,56 +152,106 @@ def score_section(df_cols: set, section: str, sheet_name: str) -> int:
         score += 2
     return score
 
-def detect_sections(xlsx_path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+# --------------------------
+# CSV reading and detection
+# --------------------------
+
+def read_csv_safely(csv_path: Path) -> pd.DataFrame:
     """
-    Scan all sheets and auto-detect which sheet(s) contain cubes, joins, dimensions, and measures.
-    It tolerates extra/unknown columns and variable sheet names.
+    Read CSV with robust defaults:
+    - auto-detect delimiter
+    - handle UTF-8 + BOM
+    - keep as object to preserve formatting
+    """
+    df = pd.read_csv(
+        csv_path,
+        sep=None,           # auto-detect delimiter
+        engine="python",    # needed for sep=None
+        dtype=object,       # keep everything as object; we'll clean/convert later
+        encoding="utf-8-sig",
+        keep_default_na=True,
+    )
+    return df
+
+def detect_csv_sections(input_path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Detect and load sections from CSV input.
+    - If input is a directory: look for cubes.csv, joins.csv, dimensions.csv, measures.csv.
+    - If input is a CSV file: detect which section it represents based on headers and filename hints.
     Returns four DataFrames (may be empty): cubes_df, joins_df, dims_df, measures_df.
     """
-    xl = pd.ExcelFile(xlsx_path, engine="openpyxl")
-
     cubes_df_list: List[pd.DataFrame] = []
     joins_df_list: List[pd.DataFrame] = []
     dims_df_list: List[pd.DataFrame] = []
     measures_df_list: List[pd.DataFrame] = []
 
-    for sheet in xl.sheet_names:
-        raw = pd.read_excel(xlsx_path, sheet_name=sheet, engine="openpyxl")
+    if input_path.is_dir():
+        # Directory mode: look for known filenames
+        for section, filename in [
+            ("cubes", "cubes.csv"),
+            ("joins", "joins.csv"),
+            ("dimensions", "dimensions.csv"),
+            ("measures", "measures.csv"),
+        ]:
+            path = input_path / filename
+            if not path.exists():
+                if verbose:
+                    print(f"[detect] {filename} not found in {input_path}, skipping.")
+                continue
+            raw = read_csv_safely(path)
+            raw = drop_empty_rows_and_columns(raw)
+            if raw.empty:
+                if verbose:
+                    print(f"[detect] {filename} is empty after cleanup, skipping.")
+                continue
+            ndf = normalize_columns(raw)
+            remapped = remap_known_columns(ndf, section)
+            if section == "cubes":
+                cubes_df_list.append(remapped)
+            elif section == "joins":
+                joins_df_list.append(remapped)
+            elif section == "dimensions":
+                dims_df_list.append(remapped)
+            elif section == "measures":
+                measures_df_list.append(remapped)
+            if verbose:
+                print(f"[detect] Loaded {filename} as {section} with {len(remapped)} rows.")
+    elif input_path.is_file():
+        # Single CSV file: auto-detect which section
+        raw = read_csv_safely(input_path)
         raw = drop_empty_rows_and_columns(raw)
         if raw.empty:
             if verbose:
-                print(f"[detect] Skip empty sheet: {sheet}")
-            continue
-
-        ndf = normalize_columns(raw)
-        # Try remapping for each section and score
-        best_section = None
-        best_score = -1
-        candidates: Dict[str, pd.DataFrame] = {}
-        for section in ("cubes", "joins", "dimensions", "measures"):
-            remapped = remap_known_columns(ndf, section)
-            candidates[section] = remapped
-            sc = score_section(set(remapped.columns), section, sheet)
-            if sc > best_score:
-                best_score = sc
-                best_section = section
-
-        # Threshold: need at least 2 matches to accept
-        if best_section and best_score >= 2:
-            chosen = candidates[best_section]
-            if verbose:
-                print(f"[detect] Sheet '{sheet}' => {best_section} (score={best_score})")
-            if best_section == "cubes":
-                cubes_df_list.append(chosen)
-            elif best_section == "joins":
-                joins_df_list.append(chosen)
-            elif best_section == "dimensions":
-                dims_df_list.append(chosen)
-            elif best_section == "measures":
-                measures_df_list.append(chosen)
+                print(f"[detect] {input_path.name} is empty after cleanup.")
         else:
-            if verbose:
-                print(f"[detect] Sheet '{sheet}' not confidently recognized (score={best_score}); ignoring.")
+            ndf = normalize_columns(raw)
+            best_section = None
+            best_score = -1
+            candidates: Dict[str, pd.DataFrame] = {}
+            for section in ("cubes", "joins", "dimensions", "measures"):
+                remapped = remap_known_columns(ndf, section)
+                candidates[section] = remapped
+                sc = score_section(set(remapped.columns), section, input_path.stem)
+                if sc > best_score:
+                    best_score = sc
+                    best_section = section
+            if best_section and best_score >= 2:
+                if verbose:
+                    print(f"[detect] File '{input_path.name}' => {best_section} (score={best_score})")
+                chosen = candidates[best_section]
+                if best_section == "cubes":
+                    cubes_df_list.append(chosen)
+                elif best_section == "joins":
+                    joins_df_list.append(chosen)
+                elif best_section == "dimensions":
+                    dims_df_list.append(chosen)
+                elif best_section == "measures":
+                    measures_df_list.append(chosen)
+            else:
+                if verbose:
+                    print(f"[detect] Could not confidently classify '{input_path.name}' (score={best_score}).")
+    else:
+        raise FileNotFoundError(f"Input path does not exist: {input_path}")
 
     cubes_df = pd.concat(cubes_df_list, ignore_index=True) if cubes_df_list else pd.DataFrame()
     joins_df = pd.concat(joins_df_list, ignore_index=True) if joins_df_list else pd.DataFrame()
@@ -236,7 +266,7 @@ def detect_sections(xlsx_path: Path, verbose: bool = False) -> Tuple[pd.DataFram
 def row_to_dict(row: pd.Series) -> Dict[str, object]:
     """
     Convert a pandas row to a plain dict with:
-    - strings trimmed and outer quotes removed
+    - strings trimmed
     - NaN -> None
     """
     out: Dict[str, object] = {}
@@ -251,19 +281,6 @@ def row_to_dict(row: pd.Series) -> Dict[str, object]:
             out[k] = vv
     return out
 
-def make_one_line_description(s: Optional[str]) -> Optional[str]:
-    """
-    Convert any multiline description into a single-line string.
-    - Collapses CR/LF to literal space for consistent single-line YAML output.
-    - Trims extra spaces around words.
-    """
-    if s is None:
-        return None
-    # Normalize newlines and replace with a space
-    s = s.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
-    # Remove extra spaces
-    return ' '.join(s.split()).strip()
-
 def build_yaml_structure(
     cubes_df: pd.DataFrame,
     joins_df: pd.DataFrame,
@@ -276,6 +293,8 @@ def build_yaml_structure(
     Create the final YAML-serializable data structure.
     - Includes unknown columns from each section row if include_unknown=True.
     - Filters to a specific cube by name if only_cube is provided.
+    - Dynamically reflects any additions, updates, or deletions present in the source CSVs,
+      because the YAML is built fresh from current CSV content each run.
     """
     result: Dict[str, object] = {}
 
@@ -300,11 +319,6 @@ def build_yaml_structure(
             for key in ("description", "name", "sql_table", "title"):
                 val = r.get(key)
                 if val is not None:
-                    # Extra cleanup for sql_table to avoid stray quotes
-                    if key == "sql_table" and isinstance(val, str):
-                        val = strip_outer_quotes(val)
-                    if key == "description" and isinstance(val, str):
-                        val = make_one_line_description(val)
                     cube_obj[key] = val
             # Unknown/extra fields
             if include_unknown:
@@ -347,6 +361,7 @@ def build_yaml_structure(
                 join_obj["relationship"] = relationship
             if sql_expr is not None:
                 join_obj["sql"] = sql_expr
+
             # Unknown/extra fields
             if include_unknown:
                 for k, v in r.items():
@@ -368,8 +383,6 @@ def build_yaml_structure(
             for key in ("name", "title", "description", "sql", "type"):
                 val = r.get(key)
                 if val is not None:
-                    if key == "description" and isinstance(val, str):
-                        val = make_one_line_description(val)
                     dim_obj[key] = val
 
             # primaryKey is optional; include only when provided or truthy
@@ -398,8 +411,6 @@ def build_yaml_structure(
             for key in ("name", "title", "description", "sql", "type"):
                 val = r.get(key)
                 if val is not None:
-                    if key == "description" and isinstance(val, str):
-                        val = make_one_line_description(val)
                     meas_obj[key] = val
 
             # Unknown/extra fields
@@ -415,29 +426,19 @@ def build_yaml_structure(
     return result
 
 # ---------------
-# YAML Dumper customization
-# ---------------
-
-class AlwaysDoubleQuotedDumper(yaml.SafeDumper):
-    """
-    Custom YAML dumper that:
-    - Uses double quotes for all strings
-    - Keeps strings in a single line unless they contain explicit literal sequences
-    """
-    def represent_str(self, data):
-        return self.represent_scalar('tag:yaml.org,2002:str', data, style='"')
-
-# ---------------
 # Command-line app
 # ---------------
 
 def main():
     """
     CLI entry point. Example:
-      python excel_to_yaml.py -i ./examples/template.xlsx -o ./output/capacity_request.yml --only-cube capacity_request --verbose
+      - Directory input with four CSVs:
+        python utility.py -i ./examples/capacity_request -o ./output/capacity_request.yml --only-cube capacity_request --verbose
+      - Single CSV input to auto-detect section:
+        python utility.py -i ./examples/dimensions.csv -o ./output/dimensions.yml --verbose
     """
-    parser = argparse.ArgumentParser(description="Convert Excel semantic template to YAML (cubes, joins, dimensions, measures).")
-    parser.add_argument("-i", "--input", required=True, help="Path to input Excel file (.xlsx)")
+    parser = argparse.ArgumentParser(description="Convert CSV-based semantic template to YAML (cubes, joins, dimensions, measures). Accepts a folder containing cubes.csv/joins.csv/dimensions.csv/measures.csv, or a single CSV file.")
+    parser.add_argument("-i", "--input", required=True, help="Path to input folder or CSV file")
     parser.add_argument("-o", "--output", required=True, help="Path to output YAML file (.yml)")
     parser.add_argument("--only-cube", help="If set, include only this cube by name and filter joins accordingly.")
     parser.add_argument("--no-include-unknown", action="store_true", help="Do not include unknown/extra columns in the output YAML.")
@@ -448,14 +449,14 @@ def main():
     output_path = Path(args.output)
 
     if not input_path.exists():
-        print(f"Error: Input file not found: {input_path}", file=sys.stderr)
+        print(f"Error: Input path not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cubes_df, joins_df, dims_df, measures_df = detect_sections(input_path, verbose=args.verbose)
+    cubes_df, joins_df, dims_df, measures_df = detect_csv_sections(input_path, verbose=args.verbose)
     if cubes_df.empty and joins_df.empty and dims_df.empty and measures_df.empty:
-        print("Error: No recognizable sections found. Check your headers or use --verbose to see detection details.", file=sys.stderr)
+        print("Error: No recognizable data found. Check your CSV headers or use --verbose to see detection details.", file=sys.stderr)
         sys.exit(1)
 
     data = build_yaml_structure(
@@ -468,16 +469,7 @@ def main():
     )
 
     with output_path.open("w", encoding="utf-8") as f:
-        yaml.dump(
-            data,
-            f,
-            Dumper=AlwaysDoubleQuotedDumper,
-            allow_unicode=True,
-            sort_keys=False,
-            width=4096,
-            default_flow_style=False,
-            indent=2,
-        )
+        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False, width=4096)
 
     print(f"Wrote YAML to: {output_path}")
 
