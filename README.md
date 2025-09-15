@@ -1,13 +1,71 @@
-Excel to YAML (Semantic) Utility
+# Excel to YAML (Semantic) Utility
 
-This utility reads an Excel template with sheets for:
-- Cubes: table, sql_table, name, description, title
-- Joins: Primary Table, Secondary Table, relationship, Primary Table Key Column, Secondary Table Key Column
-- Dimensions: name, title, description, sql, primaryKey, type
-- Measures: name, title, description, sql, type
+## Overview
 
-Usage:
-- Convert and filter to one cube (recommended):
-  python excel_to_yaml.py -i "examples/2rough_semantic_design_template - Copy - Copy.xlsx" -o output/capacity_request.yml --only-cube capacity_request
+The Excel to YAML (Semantic) Utility is a powerful tool designed to convert Excel templates into structured YAML files. This utility is particularly useful for data modeling and semantic design, allowing users to define cubes, joins, dimensions, and measures in an Excel format and seamlessly translate that into a YAML configuration.
 
-Requires Python 3.9+, pandas, openpyxl, PyYAML.
+## Features
+
+This utility reads an Excel template containing the following sheets:
+
+### 1. Cubes
+- **table**: The name of the underlying table.
+- **sql_table**: The SQL representation of the table.
+- **name**: The name of the cube.
+- **description**: A detailed description of the cube's purpose and functionality.
+- **title**: The title for display purposes.
+
+### 2. Joins
+- **Primary Table**: The main table involved in the join.
+- **Secondary Table**: The table that is being joined to the primary table.
+- **relationship**: The nature of the relationship (e.g., one-to-many).
+- **Primary Table Key Column**: The key column in the primary table.
+- **Secondary Table Key Column**: The key column in the secondary table.
+
+### 3. Dimensions
+- **name**: The name of the dimension.
+- **title**: A title for the dimension.
+- **description**: A description detailing the dimension's role.
+- **sql**: The SQL representation of the dimension.
+- **primaryKey**: Indicates if the dimension is a primary key.
+- **type**: The data type of the dimension.
+
+### 4. Measures
+- **name**: The name of the measure.
+- **title**: A title for the measure.
+- **description**: A description of the measure's purpose.
+- **sql**: The SQL representation of the measure.
+- **type**: The aggregation type (e.g., sum, average).
+
+## Usage
+
+To convert an Excel template to a YAML file, use the command line interface. Below is an example command to convert and filter to a specific cube:
+
+```bash
+python utility.py -i "input/Semantic_design_template.xlsx" -o "output/semantic_output.yml"
+```
+
+### Command-Line Options
+- `-i`, `--input`: Required. Path to the input Excel file (.xlsx).
+- `-o`, `--output`: Required. Path to the output YAML file (.yml).
+
+## Requirements
+
+This utility requires Python 3.9 or higher and the following Python packages:
+- `pandas`: For data manipulation and analysis.
+- `openpyxl`: For reading Excel files.
+- `PyYAML`: For YAML file generation.
+
+You can install the required packages using pip:
+
+```bash
+pip install pandas openpyxl PyYAML
+```
+
+## Conclusion
+
+The Excel to YAML (Semantic) Utility is an essential tool for anyone looking to streamline their data modeling process. By converting Excel templates into structured YAML files, this utility facilitates easier integration into data processing pipelines and enhances overall productivity.
+
+For any issues or suggestions, please feel free to open an issue in the repository.
+
+---
