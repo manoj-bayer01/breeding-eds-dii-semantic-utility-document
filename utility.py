@@ -60,7 +60,12 @@ def drop_empty_rows_and_columns(df: pd.DataFrame) -> pd.DataFrame:
         return df
     # Treat blank strings as NaN for emptiness checks
     df2 = df.copy()
-    df2 = df2.applymap(lambda x: None if (isinstance(x, str) and x.strip() == "") else x)
+    # Use .map() instead of deprecated .applymap()
+    try:
+        df2 = df2.map(lambda x: None if (isinstance(x, str) and x.strip() == "") else x)
+    except AttributeError:
+        # Fallback for older pandas versions
+        df2 = df2.applymap(lambda x: None if (isinstance(x, str) and x.strip() == "") else x)
     # Drop columns and rows that are entirely empty
     df2 = df2.dropna(axis=1, how="all").dropna(axis=0, how="all")
     return df2

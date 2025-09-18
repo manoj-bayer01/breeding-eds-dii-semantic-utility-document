@@ -1,0 +1,92 @@
+name: Auto Documentation Generation
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.py'
+      - '**.md'
+      - '**.xlsx'
+      - '**.yml'
+      - '**.yaml'
+      - 'input/**'
+      - 'data/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**.py'
+      - '**.md'
+      - '**.xlsx'
+      - '**.yml'
+      - '**.yaml'
+      - 'input/**'
+      - 'data/**'
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Generate YAML from Excel templates
+      run: |
+        # Process all Excel files in input directory
+        for excel_file in input/*.xlsx; do
+          if [ -f "$excel_file" ]; then
+            base_name=$(basename "$excel_file" .xlsx)
+            output_file="output/${base_name}_semantic.yml"
+            echo "Processing $excel_file -> $output_file"
+            python utility.py -i "$excel_file" -o "$output_file" --verbose
+          fi
+        done
+
+    - name: Generate documentation
+      run: |
+        python .github/scripts/generate_docs.py
+
+    - name: Update architecture documentation
+      run: |
+        python .github/scripts/update_architecture.py
+
+    - name: Update project log
+      run: |
+        python .github/scripts/update_log.py
+
+    - name: Commit and push changes
+      if: github.event_name == 'push'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Auto-update documentation [skip ci]"
+          git push
+        fi
+
+    - name: Create documentation summary
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "## 📚 Documentation Changes" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f "docs/CHANGES.md" ]; then
+          cat docs/CHANGES.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No documentation changes detected." >> $GITHUB_STEP_SUMMARY
+        fi
