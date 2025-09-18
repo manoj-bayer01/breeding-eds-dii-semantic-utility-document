@@ -69,6 +69,12 @@ For detailed information about the system architecture, components, and design d
 - **[Architecture Documentation](ARCHITECTURE.md)** - Comprehensive architecture overview
 - **[Architecture Diagrams](docs/architecture-diagrams.md)** - Visual system diagrams and data flow
 
+## API Keys and Security
+
+This utility currently operates as a standalone tool and does not require API keys. For information about API key management and future integration plans:
+
+- **[API Keys Documentation](API_KEYS.md)** - Current status, security practices, and future integration guidance
+
 ## Conclusion
 
 The Excel to YAML (Semantic) Utility is an essential tool for anyone looking to streamline their data modeling process. By converting Excel templates into structured YAML files, this utility facilitates easier integration into data processing pipelines and enhances overall productivity.

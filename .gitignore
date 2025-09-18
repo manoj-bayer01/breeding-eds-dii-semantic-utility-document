@@ -6,3 +6,16 @@
   output/
   examples/
   
+  # Security - API keys and secrets
+  .env
+  .env.local
+  .env.production
+  .env.staging
+  secrets/
+  config/local.yml
+  config/local.yaml
+  *.key
+  *.pem
+  *.p12
+  credentials.json
+  auth.json
