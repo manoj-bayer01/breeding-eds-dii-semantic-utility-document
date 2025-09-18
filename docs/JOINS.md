@@ -1,0 +1,17 @@
+# Joins Documentation
+
+## Semantic Output
+
+### experiment_sets_entries
+
+**Relationship:** one_to_many
+
+**SQL:** `{CUBE.capacity_request_id}={experiment_sets_entries.capacity_request_id}`
+
+
+### experiment_sets_entries2
+
+**Relationship:** one_to_many
+
+**SQL:** `{CUBE.capacity_request_id2}={experiment_sets_entries.capacity_request_id2}`
+

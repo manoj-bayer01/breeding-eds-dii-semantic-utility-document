@@ -62,17 +62,3 @@ You can install the required packages using pip:
 pip install pandas openpyxl PyYAML
 ```
 
-## Architecture
-
-For detailed information about the system architecture, components, and design decisions, please refer to:
-
-- **[Architecture Documentation](ARCHITECTURE.md)** - Comprehensive architecture overview
-- **[Architecture Diagrams](docs/architecture-diagrams.md)** - Visual system diagrams and data flow
-
-## Conclusion
-
-The Excel to YAML (Semantic) Utility is an essential tool for anyone looking to streamline their data modeling process. By converting Excel templates into structured YAML files, this utility facilitates easier integration into data processing pipelines and enhances overall productivity.
-
-For any issues or suggestions, please feel free to open an issue in the repository.
-
----
