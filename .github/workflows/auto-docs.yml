@@ -89,4 +89,12 @@ jobs:
           cat docs/CHANGES.md >> $GITHUB_STEP_SUMMARY
         else
           echo "No documentation changes detected." >> $GITHUB_STEP_SUMMARY
-        fi
+        fi- name: Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }} # Make sure this token has write 
+        permissions:
+      contents: write
+
+        
