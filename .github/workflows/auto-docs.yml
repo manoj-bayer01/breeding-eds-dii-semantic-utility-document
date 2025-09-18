@@ -1,3 +1,5 @@
+permissions:
+  contents: write
 name: Auto Documentation Generation
 
 on:
@@ -90,11 +92,11 @@ jobs:
         else
           echo "No documentation changes detected." >> $GITHUB_STEP_SUMMARY
         fi- name: Checkout code
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }} # Make sure this token has write 
-        permissions:
-      contents: write
+       token: ${{ secrets.GITHUB_TOKEN }}
+       fetch-depth: 0
+       
 
         
