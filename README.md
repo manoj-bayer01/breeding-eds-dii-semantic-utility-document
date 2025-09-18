@@ -62,37 +62,3 @@ You can install the required packages using pip:
 pip install pandas openpyxl PyYAML
 ```
 
-
-
-## Current Architecture
-
-*Last updated: 2025-09-18 09:18:35*
-
-This repository contains semantic data models with the following components:
-
-- **Data Cubes:** 2
-- **Joins:** 2
-- **Dimensions:** 1
-- **Measures:** 1
-
-For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## 🤖 Automated Documentation
-
-This repository includes automated documentation generation that runs on every push and pull request. The system:
-
-- Processes Excel templates into YAML semantic models
-- Generates comprehensive documentation from YAML outputs
-- Updates architecture diagrams and data lineage documentation
-- Maintains project logs and changelogs automatically
-
-See [docs/README.md](docs/README.md) for more details about the automated documentation system.
-
-
-## Conclusion
-
-The Excel to YAML (Semantic) Utility is an essential tool for anyone looking to streamline their data modeling process. By converting Excel templates into structured YAML files, this utility facilitates easier integration into data processing pipelines and enhances overall productivity.
-
-For any issues or suggestions, please feel free to open an issue in the repository.
-
----
