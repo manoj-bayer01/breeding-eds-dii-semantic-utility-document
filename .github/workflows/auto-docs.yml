@@ -81,3 +81,4 @@ jobs:
           git commit -m "Auto-update documentation [skip ci]"
           git pull origin main --rebase
           git push origin main
+        fi
