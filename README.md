@@ -62,3 +62,18 @@ You can install the required packages using pip:
 pip install pandas openpyxl PyYAML
 ```
 
+
+
+## Current Architecture
+
+*Last updated: 2025-09-18 14:16:43*
+
+This repository contains semantic data models with the following components:
+
+- **Data Cubes:** 8
+- **Joins:** 8
+- **Dimensions:** 4
+- **Measures:** 4
+
+For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+

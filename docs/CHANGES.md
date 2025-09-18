@@ -8,8 +8,8 @@ The following documentation files were updated:
 - DIMENSIONS.md
 - MEASURES.md
 
-Generated from 1 YAML file(s) containing:
-- 2 cubes
-- 2 joins  
-- 1 dimensions
-- 1 measures
+Generated from 4 YAML file(s) containing:
+- 8 cubes
+- 8 joins  
+- 4 dimensions
+- 4 measures
