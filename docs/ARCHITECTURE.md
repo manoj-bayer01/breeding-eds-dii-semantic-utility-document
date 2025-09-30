@@ -1,15 +1,4 @@
-# Data Architecture Overview
 
-*Last updated: 2025-09-30 13:31:39*
-
-## Architecture Statistics
-
-| Component | Count |
-|-----------|-------|
-| Semantic Files | 4 |
-| Data Cubes | 8 |
-| Joins | 8 |
-| Dimensions | 4 |
 | Measures | 4 |
 
 ## Data Model Diagram
