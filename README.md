@@ -66,7 +66,7 @@ pip install pandas openpyxl PyYAML
 
 ## Current Architecture
 
-*Last updated: 2025-09-18 15:39:34*
+*Last updated: 2025-09-30 13:31:39*
 
 This repository contains semantic data models with the following components:
 
